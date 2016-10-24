@@ -62,7 +62,6 @@ int item_id = 0;
 class item {
 public:
 	int id;
-	int dot_at = 0;
 
 	int core_num = 0;
 	int noncore_num = 0;
@@ -73,6 +72,8 @@ public:
 
 	//int: 项（状态） int: 文法符号
 	map<int, int> goto_to_token;
+
+	int reduce_prod = -1;
 
 	bool added[7] = {0, 0, 0, 0, 0, 0};
 	bool core_added[7] = {0, 0, 0, 0, 0, 0};
@@ -155,11 +156,14 @@ public:
 
 	void generate_next() {
 		int check_goto(product * p, int token);
-		int _dot_at = dot_at+1;
+		//在第一个for循环复制
+		int _dot_at;
 
 		item * generated_items[TOKEN_NUM] = {0};
 
 		for (int i=0; i<core_num; i++)  {
+			int dot_at = core_dot_at[i];
+			_dot_at = dot_at+1;
 			product * p = core[i];
 			// 获得第dot_at个词法单元
 			auto iterat = p->body.begin();
@@ -169,8 +173,11 @@ public:
 			int first_token = *(iterat);
 			
 			// 如果点位于产生式后部，说明可以归约，并且不产生新项
-			if (_dot_at > p->body.size())
+			if (_dot_at > p->body.size()) {
+				///处理归约
+				reduce_prod = p->index;
 				continue;
+			}
 
 			// 如果这个文法符号已经有了对应的项那么直接加入核心产生式，否则新建项并加入
 			if (generated_items[first_token] == nullptr) {
@@ -181,10 +188,10 @@ public:
 				}
 				else {
 					item * _item = new item;
-					_item->dot_at = _dot_at;
 					items[current_item++] = _item;
 					generated_items[first_token] = _item;
 					goto_map.insert({ { p , first_token }, current_item - 1 });
+					goto_to_token.insert({ current_item - 1, first_token });
 				}
 			}
 			if (_dot_at <= p->body.size())
@@ -203,10 +210,10 @@ public:
 				}
 				else {
 					item * _item = new item;
-					_item->dot_at = _dot_at;
 					items[current_item++] = _item;
 					generated_items[first_token] = _item;
 					goto_map.insert({ { p , first_token }, current_item - 1 });
+					goto_to_token.insert({ current_item - 1, first_token });
 				}
 			}
 			if (_dot_at <= p->body.size())
@@ -222,6 +229,10 @@ int check_goto(product * p, int token) {
 		return -1;
 	}
 	return it->second;
+}
+
+void create_sal() {
+
 }
 
 int main() {
@@ -262,4 +273,18 @@ int main() {
 	}
 
 	//cout << check_goto(prod, N_E);
+	cout << "GOTO(I[i], a) values:\n";
+	for (int i=0; i<current_item; i++) {
+		for (auto it : items[i]->goto_to_token) {
+			cout << "GOTO(i[" << i << "], " << exprs[it.second] << " )=s" << it.first << endl;
+		}	
+	}
+
+	cout << "Reduces:\n";
+	for (int i=0; i<current_item; i++) {
+		if (items[i]->reduce_prod == -1)
+			continue;
+		cout << "I[" << i << "]=r" << items[i]->reduce_prod << " (aka: ";
+		prod[items[i]->reduce_prod].output();
+	}
 }
